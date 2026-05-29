@@ -140,6 +140,7 @@ class TaskController extends Controller
             'message' => 'Quest berhasil dihapus!'
         ], 200);
     }
+<<<<<<< HEAD
     
     // ==========================================
     // 6. FUNGSI PAPAN PERINGKAT (LEADERBOARD)
@@ -156,4 +157,6 @@ class TaskController extends Controller
             'leaderboard' => $users
         ], 200);
     }
+=======
+>>>>>>> 8d13f21794e470fcfd26f6ee165fae9db6dedf07
 }

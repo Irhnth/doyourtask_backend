@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\TaskController;
 
+<<<<<<< HEAD
 // ========================================================
 // TAMBAHAN: Tangkap error jika user tidak bawa token valid
 // ========================================================
@@ -14,6 +15,8 @@ Route::get('/login', function () {
     ], 401);
 })->name('login');
 
+=======
+>>>>>>> 8d13f21794e470fcfd26f6ee165fae9db6dedf07
 // Rute Publik (Tidak butuh Token)
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -32,9 +35,16 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Rute Eksekusi Gamifikasi
     Route::post('/tasks/{id}/complete', [TaskController::class, 'completeTask']);
+<<<<<<< HEAD
     Route::put('/tasks/{id}', [TaskController::class, 'update']);
     Route::delete('/tasks/{id}', [TaskController::class, 'destroy']);
 
     // BARU: Jalur untuk mengambil data papan peringkat
     Route::get('/leaderboard', [App\Http\Controllers\TaskController::class, 'leaderboard']);
 });
+=======
+    // TAMBAHKAN 2 BARIS INI:
+    Route::put('/tasks/{id}', [TaskController::class, 'update']);
+    Route::delete('/tasks/{id}', [TaskController::class, 'destroy']);
+});
+>>>>>>> 8d13f21794e470fcfd26f6ee165fae9db6dedf07
