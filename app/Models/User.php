@@ -57,4 +57,15 @@ class User extends Authenticatable
                     ->withPivot('achieved_at')
                     ->withTimestamps();
     }
+    // Relasi ke target kesehatan
+    public function healthTargets()
+    {
+        return $this->hasMany(HealthTarget::class);
+    }
+
+    // Relasi ke riwayat/log kesehatan
+    public function healthLogs()
+    {
+        return $this->hasMany(HealthLog::class);
+    }
 }
