@@ -15,8 +15,9 @@ class HealthLogResource extends Resource
     protected static ?string $model = HealthLog::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
-    protected static ?string $navigationGroup = 'Health Management';
-    protected static ?string $navigationLabel = 'Daily Logs';
+    protected static ?string $navigationGroup = 'Manajemen Kesehatan';
+    protected static ?string $navigationLabel = 'Log Harian';
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {

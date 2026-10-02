@@ -20,7 +20,10 @@ class BadgeResource extends Resource
 {
     protected static ?string $model = Badge::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-trophy';
+    protected static ?string $navigationGroup = 'Gamifikasi';
+    protected static ?string $navigationLabel = 'Lencana (Badges)';
+    protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
     {

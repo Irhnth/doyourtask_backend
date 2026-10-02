@@ -18,7 +18,10 @@ class LevelResource extends Resource
 {
     protected static ?string $model = Level::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-sparkles';
+    protected static ?string $navigationGroup = 'Gamifikasi';
+    protected static ?string $navigationLabel = 'Tingkatan (Levels)';
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {

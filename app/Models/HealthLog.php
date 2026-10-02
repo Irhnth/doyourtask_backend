@@ -16,11 +16,15 @@ class HealthLog extends Model
         'date',
         'current_value',
         'is_completed',
+        'last_milestone',
+        'earned_xp',
     ];
 
     protected $casts = [
         'date' => 'date',
         'is_completed' => 'boolean',
+        'last_milestone' => 'integer',
+        'earned_xp' => 'integer',
     ];
 
     // Relasi: Log ini milik siapa?

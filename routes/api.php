@@ -58,15 +58,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // Mengambil progress kesehatan hari ini
     Route::get('/health/today', [HealthController::class, 'getTodayProgress']);
 
-    // Menyimpan target kesehatan
+    // Menyimpan target kesehatan baru
     Route::post('/health/target', [HealthController::class, 'storeTarget']);
 
-    // Memperbarui progress target kesehatan
+    // Mengedit target kesehatan
+    Route::put('/health/target/{id}', [HealthController::class, 'updateTarget']);
+
+    // Memperbarui progress target kesehatan (inkremental biasa)
     Route::put('/health/target/{targetId}/progress', [HealthController::class, 'updateProgress']);
 
-    // Rute Health Target & Log
-    Route::get('/health/today', [HealthController::class, 'getTodayProgress']);
-    Route::post('/health/target', [HealthController::class, 'storeTarget']);
-    Route::put('/health/target/{id}', [HealthController::class, 'updateTarget']); // TAMBAHKAN INI
-    Route::put('/health/target/{targetId}/progress', [HealthController::class, 'updateProgress']);
+    // Memperbarui progress langkah (Step Counter dengan Milestone XP)
+    Route::put('/health/target/{targetId}/steps', [HealthController::class, 'updateStepProgress']);
 });

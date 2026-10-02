@@ -23,9 +23,27 @@ class HealthController extends Controller
             }])
             ->get();
 
+        // Cek apakah target langkah sudah ada, jika belum otomatis buatkan default 6.000 langkah
+        $hasStepTarget = $targets->contains(function ($t) {
+            $unit = strtolower($t->unit ?? '');
+            $title = strtolower($t->title ?? '');
+            return $unit === 'langkah' || str_contains($title, 'langkah');
+        });
+
+        if (!$hasStepTarget) {
+            $newTarget = HealthTarget::create([
+                'user_id' => $user->id,
+                'title' => 'Langkah Kaki',
+                'type' => 'other',
+                'target_value' => 6000,
+                'unit' => 'Langkah',
+            ]);
+            $newTarget->setRelation('logs', collect());
+            $targets->push($newTarget);
+        }
+
         // Format data agar mudah dibaca oleh Flutter
         $data = $targets->map(function ($target) use ($today, $user) {
-            // Jika belum ada log hari ini, buat nilai default 0
             $log = $target->logs->first();
             
             return [
@@ -35,7 +53,10 @@ class HealthController extends Controller
                 'target_value' => $target->target_value,
                 'unit' => $target->unit,
                 'current_value' => $log ? $log->current_value : 0,
-                'is_completed' => $log ? $log->is_completed : false,
+                'is_completed' => $log ? (bool)$log->is_completed : false,
+                'last_milestone' => $log ? (int)($log->last_milestone ?? 0) : 0,
+                'total_xp' => $log ? (int)($log->earned_xp ?? 0) : 0,
+                'max_xp' => 50,
             ];
         });
 
@@ -71,7 +92,7 @@ class HealthController extends Controller
         ]);
     }
 
-    // Memperbarui progres harian dan memberikan EXP
+    // 3. Memperbarui progres harian manual (Inkremental biasa)
     public function updateProgress(Request $request, $targetId)
     {
         $request->validate([
@@ -84,7 +105,7 @@ class HealthController extends Controller
 
         $log = HealthLog::firstOrCreate(
             ['user_id' => $user->id, 'health_target_id' => $target->id, 'date' => $today],
-            ['current_value' => 0, 'is_completed' => false]
+            ['current_value' => 0, 'is_completed' => false, 'last_milestone' => 0, 'earned_xp' => 0]
         );
 
         // Jika sudah selesai sebelumnya hari ini, jangan proses lagi
@@ -106,7 +127,6 @@ class HealthController extends Controller
 
         // JIKA TARGET TERCAPAI HARI INI
         if ($isCompleted) {
-            // 1. Tentukan nilai default untuk referensi
             $defaultValues = [
                 'drink' => 8,
                 'exercise' => 30,
@@ -114,22 +134,16 @@ class HealthController extends Controller
                 'other' => 1
             ];
             $defaultValue = $defaultValues[$target->type] ?? 1;
-
-            // 2. Hitung selisih dari default
             $diff = $target->target_value - $defaultValue;
 
-            // 3. Kalkulasi XP: Base 50 + (Selisih * 10)
             $earnedXp = 50 + ($diff * 10);
-            
-            // Jangan sampai XP minus jika user menurunkan target terlalu jauh
             if ($earnedXp < 10) {
                 $earnedXp = 10; 
             }
 
-            // 4. Tambahkan XP ke pengguna
             $user->current_xp += $earnedXp;
 
-           // 5. Cek Naik Level
+            // Cek Naik Level
             $levels = \App\Models\Level::orderBy('xp_required', 'asc')->get();
             foreach ($levels as $level) {
                 if ($user->current_xp >= $level->xp_required) {
@@ -143,10 +157,10 @@ class HealthController extends Controller
             $user->save();
         }
 
-        // Simpan pembaruan progres
         $log->update([
             'current_value' => $newValue,
-            'is_completed' => $isCompleted
+            'is_completed' => $isCompleted,
+            'earned_xp' => ($log->earned_xp ?? 0) + $earnedXp
         ]);
 
         return response()->json([
@@ -158,7 +172,110 @@ class HealthController extends Controller
             'new_level' => $newLevelName
         ]);
     }
-    // Memperbarui informasi target kesehatan (Edit Target)
+
+    // 4. Memperbarui progres langkah (Step Counter dengan Milestone XP Maksimal 50 XP)
+    public function updateStepProgress(Request $request, $targetId)
+    {
+        $request->validate([
+            'current_steps' => 'required|integer|min:0'
+        ]);
+
+        $user = Auth::user();
+        $target = HealthTarget::where('user_id', $user->id)->findOrFail($targetId);
+        $today = Carbon::today()->toDateString();
+
+        $log = HealthLog::firstOrCreate(
+            ['user_id' => $user->id, 'health_target_id' => $target->id, 'date' => $today],
+            ['current_value' => 0, 'is_completed' => false, 'last_milestone' => 0, 'earned_xp' => 0]
+        );
+
+        $targetValue = max(1, (int)$target->target_value);
+        $currentSteps = max(0, (int)$request->input('current_steps'));
+        $percentage = (int)floor(($currentSteps / $targetValue) * 100);
+
+        // Aturan Milestone XP:
+        // 20%  -> +5 XP
+        // 40%  -> +5 XP
+        // 60%  -> +10 XP
+        // 80%  -> +10 XP
+        // 100% -> +20 XP
+        // Total maksimal: 50 XP
+        $milestones = [
+            20 => 5,
+            40 => 5,
+            60 => 10,
+            80 => 10,
+            100 => 20,
+        ];
+
+        $lastMilestone = (int)($log->last_milestone ?? 0);
+        $currentTotalXp = (int)($log->earned_xp ?? 0);
+        $earnedXp = 0;
+        $newLastMilestone = $lastMilestone;
+        $milestoneReached = false;
+
+        if ($currentTotalXp < 50) {
+            foreach ($milestones as $ms => $xpReward) {
+                if ($percentage >= $ms && $ms > $lastMilestone) {
+                    $remainingQuota = 50 - ($currentTotalXp + $earnedXp);
+                    $reward = min($xpReward, $remainingQuota);
+                    if ($reward > 0) {
+                        $earnedXp += $reward;
+                        $newLastMilestone = $ms;
+                        $milestoneReached = true;
+                    }
+                }
+            }
+        }
+
+        $newTotalXp = min(50, $currentTotalXp + $earnedXp);
+        $isCompleted = ($percentage >= 100) || (bool)$log->is_completed;
+
+        // Tambahkan XP ke pengguna jika ada XP baru
+        $isLevelUp = false;
+        $newLevelName = null;
+
+        if ($earnedXp > 0) {
+            $user->current_xp += $earnedXp;
+
+            // Cek Naik Level
+            $levels = \App\Models\Level::orderBy('xp_required', 'asc')->get();
+            foreach ($levels as $level) {
+                if ($user->current_xp >= $level->xp_required) {
+                    if ($user->level_id !== $level->id) {
+                        $user->level_id = $level->id;
+                        $isLevelUp = true;
+                        $newLevelName = $level->level_name;
+                    }
+                }
+            }
+            $user->save();
+        }
+
+        // Perbarui log kesehatan
+        $log->current_value = $currentSteps;
+        $log->is_completed = $isCompleted;
+        $log->last_milestone = max($lastMilestone, $newLastMilestone);
+        $log->earned_xp = $newTotalXp;
+        $log->save();
+
+        return response()->json([
+            'success' => true,
+            'current_value' => $currentSteps,
+            'target_value' => $targetValue,
+            'progress_percentage' => min(100, $percentage),
+            'milestone' => $log->last_milestone,
+            'milestone_reached' => $milestoneReached,
+            'earned_xp' => $earnedXp,
+            'total_xp' => $newTotalXp,
+            'max_xp' => 50,
+            'is_completed' => $isCompleted,
+            'is_level_up' => $isLevelUp,
+            'new_level' => $newLevelName
+        ]);
+    }
+
+    // 5. Memperbarui informasi target kesehatan (Edit Target)
     public function updateTarget(Request $request, $id)
     {
         $request->validate([

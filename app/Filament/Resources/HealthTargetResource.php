@@ -14,10 +14,10 @@ class HealthTargetResource extends Resource
 {
     protected static ?string $model = HealthTarget::class;
 
-    // Menyesuaikan ikon dan mengelompokkan menu di sidebar
     protected static ?string $navigationIcon = 'heroicon-o-heart';
-    protected static ?string $navigationGroup = 'Health Management';
-    protected static ?string $navigationLabel = 'Targets';
+    protected static ?string $navigationGroup = 'Manajemen Kesehatan';
+    protected static ?string $navigationLabel = 'Target Kesehatan';
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {

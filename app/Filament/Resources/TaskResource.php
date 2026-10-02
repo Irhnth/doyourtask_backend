@@ -21,7 +21,10 @@ class TaskResource extends Resource
 {
     protected static ?string $model = Task::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
+    protected static ?string $navigationGroup = 'Manajemen Tugas';
+    protected static ?string $navigationLabel = 'Daftar Tugas';
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
