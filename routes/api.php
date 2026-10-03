@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\ChallengeController;
 
 // ========================================================
 // TAMBAHAN: Tangkap error jika user tidak bawa token valid
@@ -69,4 +70,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Memperbarui progress langkah (Step Counter dengan Milestone XP)
     Route::put('/health/target/{targetId}/steps', [HealthController::class, 'updateStepProgress']);
+
+    // ----------------------------------------------------
+    // Rute Tantangan 28 Hari (Challenge)
+    // ----------------------------------------------------
+    Route::get('/challenges', [ChallengeController::class, 'index']);
+    Route::get('/challenges/active', [ChallengeController::class, 'getActiveChallenge']);
+    Route::post('/challenges/{id}/join', [ChallengeController::class, 'joinChallenge']);
+    Route::post('/challenges/active/complete-day', [ChallengeController::class, 'completeDay']);
+    Route::post('/challenges/active/abandon', [ChallengeController::class, 'abandonChallenge']);
 });

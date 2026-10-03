@@ -68,4 +68,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(HealthLog::class);
     }
+
+    // Relasi ke tantangan 28 hari
+    public function userChallenges()
+    {
+        return $this->hasMany(UserChallenge::class);
+    }
 }
