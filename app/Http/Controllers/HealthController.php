@@ -260,7 +260,23 @@ class HealthController extends Controller
         $log->save();
 
         return response()->json([
+            'status' => 'success',
             'success' => true,
+            'message' => 'Progres langkah berhasil disinkronkan',
+            'data' => [
+                'current_value' => $currentSteps,
+                'target_value' => $targetValue,
+                'progress_percentage' => min(100, $percentage),
+                'milestone' => $log->last_milestone,
+                'milestone_reached' => $milestoneReached,
+                'earned_xp' => $earnedXp,
+                'total_xp' => $newTotalXp,
+                'max_xp' => 50,
+                'is_completed' => $isCompleted,
+                'is_level_up' => $isLevelUp,
+                'new_level' => $newLevelName,
+            ],
+            // Kompatibilitas level atas
             'current_value' => $currentSteps,
             'target_value' => $targetValue,
             'progress_percentage' => min(100, $percentage),
@@ -271,7 +287,7 @@ class HealthController extends Controller
             'max_xp' => 50,
             'is_completed' => $isCompleted,
             'is_level_up' => $isLevelUp,
-            'new_level' => $newLevelName
+            'new_level' => $newLevelName,
         ]);
     }
 

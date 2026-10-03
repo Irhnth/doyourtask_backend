@@ -20,7 +20,10 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($levels as $level) {
-            Level::create($level);
+            Level::firstOrCreate(
+                ['level_number' => $level['level_number']],
+                ['level_name' => $level['level_name'], 'xp_required' => $level['xp_required']]
+            );
         }
 
         // 2. Membuat Data Master Badge (Lencana)
@@ -43,9 +46,15 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($badges as $badge) {
-            Badge::create($badge);
+            Badge::firstOrCreate(
+                ['badge_name' => $badge['badge_name']],
+                ['requirement_count' => $badge['requirement_count'], 'image_icon' => $badge['image_icon']]
+            );
         }
 
-        echo "Data Level dan Badge berhasil di-generate!\n";
+        // 3. Menjalankan ChallengeSeeder (Tantangan 28 Hari & 28 Misi Harian)
+        $this->call(ChallengeSeeder::class);
+
+        $this->command->info("Data Level, Badge, dan Tantangan 28 Hari berhasil di-generate!");
     }
 }

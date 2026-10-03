@@ -30,13 +30,13 @@ class ChallengeSeeder extends Seeder
 
         // 2. Buat Master Program Tantangan 28 Hari
         $grandChampionBadge = $createdBadges['28-Day Champion'] ?? null;
-        $challenge = Challenge::firstOrCreate(
+        $challenge = Challenge::updateOrCreate(
             ['title' => 'Tantangan 28 Hari: Bangun Kebiasaan Produktif & Sehat'],
             [
                 'description' => 'Program 4 minggu terstruktur untuk melatih konsistensi, menaklukkan penundaan, serta menyelaraskan produktivitas harian dengan kesehatan fisik dan mental.',
                 'category' => 'habit',
                 'duration_days' => 28,
-                'total_reward_xp' => 1400,
+                'total_reward_xp' => 1545,
                 'badge_id' => $grandChampionBadge ? $grandChampionBadge->id : null,
                 'is_active' => true,
             ]

@@ -209,6 +209,14 @@ class ChallengeController extends Controller
         $dayNumber = $request->input('day_number', $calendarDay);
         $dayNumber = max(1, min(28, (int)$dayNumber));
 
+        // 1. Validasi: Kunci hari di masa depan agar tidak bisa dicurangi
+        if ($dayNumber > $calendarDay) {
+            return response()->json([
+                'status' => 'error',
+                'message' => "Hari ke-$dayNumber belum dibuka! Kamu hanya dapat menyelesaikan misi hari ini (Hari ke-$calendarDay) atau hari sebelumnya yang terlewat.",
+            ], 422);
+        }
+
         // Cek apakah hari ini sudah pernah selesai
         $existingLog = UserChallengeLog::where('user_challenge_id', $userChallenge->id)
             ->where('day_number', $dayNumber)
@@ -226,6 +234,124 @@ class ChallengeController extends Controller
         $mission = ChallengeDay::where('challenge_id', $userChallenge->challenge_id)
             ->where('day_number', $dayNumber)
             ->first();
+
+        // 2. Verifikasi pemenuhan misi aktual dari aktivitas pengguna
+        if ($mission) {
+            $scheduledDate = $startDate->copy()->addDays($dayNumber - 1)->toDateString();
+            $targetMetric = (int) $mission->target_metric;
+
+            switch ($mission->mission_type) {
+                case 'task':
+                    // Verifikasi jumlah quest/tugas yang diselesaikan pengguna
+                    $completedTasksCount = \App\Models\Task::where('user_id', $user->id)
+                        ->where('status', 'completed')
+                        ->where(function ($q) use ($todayStr, $scheduledDate) {
+                            $hasCompletedAt = \Illuminate\Support\Facades\Schema::hasColumn('tasks', 'completed_at');
+                            if ($hasCompletedAt) {
+                                $q->whereDate('completed_at', $todayStr)
+                                  ->orWhereDate('completed_at', $scheduledDate)
+                                  ->orWhereDate('updated_at', $todayStr)
+                                  ->orWhereDate('updated_at', $scheduledDate);
+                            } else {
+                                $q->whereDate('updated_at', $todayStr)
+                                  ->orWhereDate('updated_at', $scheduledDate);
+                            }
+                        })
+                        ->count();
+
+                    if ($completedTasksCount < $targetMetric) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => "Misi belum terpenuhi! Kamu baru menyelesaikan $completedTasksCount dari target $targetMetric quest. Selesaikan quest di menu Tugas terlebih dahulu.",
+                            'current_metric' => $completedTasksCount,
+                            'target_metric' => $targetMetric,
+                        ], 422);
+                    }
+                    break;
+
+                case 'health':
+                    // Jika target metrik >= 1000, ini adalah misi Langkah Kaki
+                    if ($targetMetric >= 1000) {
+                        $stepTarget = \App\Models\HealthTarget::where('user_id', $user->id)
+                            ->where(function ($q) {
+                                $q->where('unit', 'like', '%langkah%')
+                                  ->orWhere('title', 'like', '%langkah%');
+                            })
+                            ->first();
+
+                        $currentSteps = 0;
+                        if ($stepTarget) {
+                            $healthLog = \App\Models\HealthLog::where('health_target_id', $stepTarget->id)
+                                ->where(function ($q) use ($todayStr, $scheduledDate) {
+                                    $q->where('date', $todayStr)
+                                      ->orWhere('date', $scheduledDate);
+                                })
+                                ->orderByDesc('current_value')
+                                ->first();
+                            $currentSteps = $healthLog ? (int)$healthLog->current_value : 0;
+                        }
+
+                        if ($currentSteps < $targetMetric) {
+                            $formattedSteps = number_format($currentSteps, 0, ',', '.');
+                            $formattedTarget = number_format($targetMetric, 0, ',', '.');
+                            return response()->json([
+                                'status' => 'error',
+                                'message' => "Misi belum terpenuhi! Langkah kamu baru tercatat $formattedSteps dari target $formattedTarget langkah hari ini. Buka menu Langkah untuk menyinkronkan!",
+                                'current_metric' => $currentSteps,
+                                'target_metric' => $targetMetric,
+                            ], 422);
+                        }
+                    } else {
+                        // Misi hidrasi air putih atau peregangan fisik
+                        $healthSatisfied = \App\Models\HealthTarget::where('user_id', $user->id)
+                            ->whereHas('logs', function ($q) use ($targetMetric, $todayStr, $scheduledDate) {
+                                $q->where(function ($d) use ($todayStr, $scheduledDate) {
+                                    $d->where('date', $todayStr)->orWhere('date', $scheduledDate);
+                                })->where('current_value', '>=', $targetMetric);
+                            })
+                            ->exists();
+
+                        if (!$healthSatisfied) {
+                            return response()->json([
+                                'status' => 'error',
+                                'message' => "Misi belum terpenuhi! Target kesehatan harianmu belum mencapai $targetMetric. Catat progresmu di menu Kesehatan!",
+                                'target_metric' => $targetMetric,
+                            ], 422);
+                        }
+                    }
+                    break;
+
+                case 'focus':
+                    // Verifikasi sesi fokus/Pomodoro
+                    $focusSatisfied = \App\Models\HealthTarget::where('user_id', $user->id)
+                        ->where(function ($q) {
+                            $q->where('type', 'exercise')
+                              ->orWhere('type', 'other')
+                              ->orWhere('title', 'like', '%pomodoro%')
+                              ->orWhere('title', 'like', '%fokus%');
+                        })
+                        ->whereHas('logs', function ($q) use ($targetMetric, $todayStr, $scheduledDate) {
+                            $q->where(function ($d) use ($todayStr, $scheduledDate) {
+                                $d->where('date', $todayStr)->orWhere('date', $scheduledDate);
+                            })->where('current_value', '>=', $targetMetric);
+                        })
+                        ->exists();
+
+                    if (!$focusSatisfied) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => "Misi belum terpenuhi! Kamu belum menyelesaikan sesi fokus minimal $targetMetric menit hari ini. Mulai sesi di timer Pomodoro!",
+                            'target_metric' => $targetMetric,
+                        ], 422);
+                    }
+                    break;
+
+                case 'custom':
+                default:
+                    // Misi kustom/refleksi: verifikasi selesai melalui check-in dan catatan
+                    break;
+            }
+        }
 
         $earnedXp = $mission ? ($mission->reward_xp + $mission->milestone_bonus_xp) : 25;
 

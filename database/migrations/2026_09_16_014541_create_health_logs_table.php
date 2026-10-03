@@ -16,6 +16,8 @@ return new class extends Migration
             $table->date('date'); // Tanggal pencatatan
             $table->integer('current_value')->default(0); // Progres saat ini
             $table->boolean('is_completed')->default(false); // Status selesai atau belum
+            $table->integer('last_milestone')->default(0); // Pencapaian milestone langkah terakhir
+            $table->integer('earned_xp')->default(0); // Total XP yang sudah didapat dari milestone hari ini
             
             $table->timestamps();
 

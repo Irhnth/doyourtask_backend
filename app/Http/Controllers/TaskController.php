@@ -6,6 +6,7 @@ use App\Models\Task;
 use App\Models\Level;
 use App\Models\Badge;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class TaskController extends Controller
 {
@@ -51,8 +52,11 @@ class TaskController extends Controller
             return response()->json(['message' => 'Tugas ini sudah diselesaikan sebelumnya'], 400);
         }
 
-        // A. Ubah status tugas menjadi selesai
-        $task->update(['status' => 'completed']);
+        // A. Ubah status tugas menjadi selesai & catat waktu penyelesaian aktual
+        $task->update([
+            'status' => 'completed',
+            'completed_at' => now(),
+        ]);
 
         // B. Tambahkan XP ke User
         $user->current_xp += $task->reward_xp;
@@ -154,6 +158,109 @@ class TaskController extends Controller
 
         return response()->json([
             'leaderboard' => $users
+        ], 200);
+    }
+
+    // ==========================================
+    // 7. FUNGSI ANALISIS PERILAKU PENUNDAAN
+    // ==========================================
+    public function procrastinationAnalysis(Request $request)
+    {
+        $user = $request->user();
+        $tasks = Task::where('user_id', $user->id)->get();
+
+        $now = now();
+        $onTime = 0;
+        $lastMinute = 0;
+        $lateCompleted = 0;
+        $overduePending = 0;
+
+        foreach ($tasks as $task) {
+            if (!$task->deadline) continue;
+            $deadline = Carbon::parse($task->deadline);
+
+            if ($task->status === 'completed') {
+                // Gunakan completed_at aktual, fallback ke updated_at jika completed_at null
+                $completedAt = $task->completed_at 
+                    ? Carbon::parse($task->completed_at) 
+                    : ($task->updated_at ? Carbon::parse($task->updated_at) : $deadline);
+
+                if ($completedAt->gt($deadline)) {
+                    $lateCompleted++;
+                } else {
+                    $diffInHours = $completedAt->diffInHours($deadline, false);
+                    if ($diffInHours < 3) {
+                        $lastMinute++;
+                    } else {
+                        $onTime++;
+                    }
+                }
+            } else {
+                if ($now->gt($deadline)) {
+                    $overduePending++;
+                }
+            }
+        }
+
+        $totalEvaluated = $onTime + $lastMinute + $lateCompleted + overduePending;
+        $score = 0;
+        if ($totalEvaluated > 0) {
+            $rawScore = (($onTime * 1.0 + $lastMinute * 0.5) / $totalEvaluated) * 100;
+            $score = (int) max(0, min(100, round($rawScore)));
+        }
+
+        if ($totalEvaluated === 0) {
+            $archetype = 'Belum Cukup Data';
+            $description = 'Selesaikan beberapa quest untuk mulai melihat pola manajemen waktumu.';
+            $color = '#8F9BB3';
+            $tips = [
+                'Tetapkan tenggat waktu yang realistis pada setiap quest baru.',
+                'Selesaikan tugas lebih awal untuk membangun ritme kerja yang tenang.',
+                'Manfaatkan timer Pomodoro di menu Kesehatan untuk melatih fokus intensif.',
+            ];
+        } elseif ($score >= 80 && $overduePending === 0) {
+            $archetype = 'Eksekutor Proaktif';
+            $description = 'Luar biasa! Kamu konsisten menuntaskan quest jauh sebelum batas waktu tanpa menunda.';
+            $color = '#00E096';
+            $tips = [
+                'Pertahankan kebiasaan baik dengan terus memecah quest besar menjadi langkah kecil.',
+                'Berikan waktu istirahat yang cukup di sela-sela pencapaian tugasmu agar tidak burnout.',
+                'Tantang dirimu dengan quest baru yang lebih menantang untuk memaksimalkan perolehan XP.',
+            ];
+        } elseif ($score >= 50 || ($lastMinute > $onTime && $overduePending <= 1)) {
+            $archetype = 'Pejuang Deadline';
+            $description = 'Kamu sering menyelesaikan quest mepet menit-menit akhir menjelang batas waktu.';
+            $color = '#FFAA00';
+            $tips = [
+                'Terapkan "Aturan 5 Menit": paksa dirimu memulai tugas selama 5 menit tanpa distraksi untuk mengatasi rasa malas awal.',
+                'Gunakan timer Pomodoro (25 menit kerja, 5 menit istirahat) untuk mencegah stres di akhir.',
+                'Buat target selesai pribadi 3-6 jam sebelum tenggat waktu sebenarnya.',
+            ];
+        } else {
+            $archetype = 'Kerap Menunda';
+            $description = 'Terdapat beberapa quest yang terlambat atau melewati tenggat waktu. Yuk atur ulang fokusmu!';
+            $color = '#FF3D71';
+            $tips = [
+                'Pilih satu tugas paling kecil dan selesaikan pagi ini juga (konsep Quick Win).',
+                'Pecah tugas besar menjadi sub-tugas berdurasi 15-20 menit agar tidak terasa membebani mental.',
+                'Singkirkan notifikasi ponsel dan buka mode fokus saat mengerjakan tugas.',
+            ];
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'on_time_count' => $onTime,
+                'last_minute_count' => $lastMinute,
+                'late_completed_count' => $lateCompleted,
+                'overdue_pending_count' => $overduePending,
+                'total_evaluated' => $totalEvaluated,
+                'score' => $score,
+                'archetype_title' => $archetype,
+                'archetype_desc' => $description,
+                'archetype_color' => $color,
+                'tips' => $tips,
+            ]
         ], 200);
     }
 }

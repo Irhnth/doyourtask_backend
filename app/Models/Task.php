@@ -14,6 +14,7 @@ class Task extends Model
     // Casting agar tipe data waktu (datetime) dibaca dengan benar
     protected $casts = [
         'deadline' => 'datetime',
+        'completed_at' => 'datetime',
     ];
 
     // Relasi ke tabel users

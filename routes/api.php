@@ -39,6 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ----------------------------------------------------
     Route::get('/tasks', [TaskController::class, 'index']);
     Route::post('/tasks', [TaskController::class, 'store']);
+    Route::get('/tasks/procrastination-analysis', [TaskController::class, 'procrastinationAnalysis']);
 
     // ----------------------------------------------------
     // Rute Eksekusi Gamifikasi
